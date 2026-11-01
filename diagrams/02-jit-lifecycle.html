@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>@jax.jit Trace vs Cached Execution · Sequence</title>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --color-paper: #F7F6F2;
+      --color-paper-2: #EFECE6;
+      --color-ink: #0F2547;
+      --color-muted: #3B5B8C;
+      --color-accent: #C59216;
+      --color-accent-text: #9A6F0B;
+      --font-sans: 'Geist', system-ui, sans-serif;
+      --font-serif: 'Instrument Serif', serif;
+      --font-mono: 'Geist Mono', ui-monospace, monospace;
+    }
+    body {
+      font-family: var(--font-sans);
+      background: var(--color-paper);
+      color: var(--color-ink);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2.5rem 2rem;
+    }
+    .frame { max-width: 1120px; width: 100%; }
+    .diagram-container { width: 100%; overflow-x: auto; }
+    .eyebrow {
+      font-family: var(--font-mono);
+      font-size: 0.66rem;
+      font-weight: 500;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--color-muted);
+      margin-bottom: 0.5rem;
+    }
+    h1 {
+      font-family: var(--font-serif);
+      font-size: clamp(1.5rem, 2.4vw + 0.75rem, 2rem);
+      font-weight: 400;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+      color: var(--color-ink);
+      margin-bottom: 1.5rem;
+    }
+    svg { width: 100%; min-width: 1040px; display: block; }
+    @media print {
+      .diagram-container { overflow-x: visible; }
+      svg { min-width: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <p class="eyebrow">Sequence · JAX &amp; OpenXLA Field Guide</p>
+    <h1>@jax.jit lifecycle: first-call tracing vs cached PJRT dispatch</h1>
+
+    <div class="diagram-container">
+      <svg viewBox="0 0 1040 620" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="jit-lifecycle-title jit-lifecycle-desc">
+        <title id="jit-lifecycle-title">@jax.jit lifecycle sequence</title>
+        <desc id="jit-lifecycle-desc">Sequence diagram showing how @jax.jit traces ShapedArray inputs into Jaxpr and compiles StableHLO via OpenXLA on the first call, then dispatches directly to the cached PJRT executable on subsequent calls with the same shape.</desc>
+        <defs>
+          <pattern id="dots" width="24" height="24" patternUnits="userSpaceOnUse">
+            <circle cx="2" cy="2" r="0.9" fill="rgba(15,37,71,0.10)"/>
+          </pattern>
+          <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+            <polygon points="0 0, 8 3, 0 6" fill="#3B5B8C"/>
+          </marker>
+          <marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+            <polygon points="0 0, 8 3, 0 6" fill="#C59216"/>
+          </marker>
+        </defs>
+
+        <!-- Paper Background -->
+        <rect width="1040" height="620" fill="#F7F6F2"/>
+        <rect width="1040" height="620" fill="url(#dots)" opacity="0.55"/>
+
+        <!-- Combined Fragment: ALT [cache miss vs cache hit] -->
+        <rect x="44" y="148" width="952" height="368" rx="4" fill="rgba(15,37,71,0.02)" stroke="rgba(15,37,71,0.22)" stroke-width="1"/>
+        <rect x="44" y="148" width="44" height="16" rx="2" fill="#EFECE6" stroke="rgba(15,37,71,0.22)" stroke-width="1"/>
+        <text x="66" y="159" fill="#0F2547" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.12em">ALT</text>
+        <text x="100" y="160" fill="#3B5B8C" font-size="8.5" font-family="'Geist Mono', monospace">[1st call: (shape, dtype) cache miss → trace &amp; compile]</text>
+
+        <line x1="52" y1="380" x2="988" y2="380" stroke="rgba(15,37,71,0.22)" stroke-width="1" stroke-dasharray="4,3"/>
+        <text x="60" y="396" fill="#9A6F0B" font-size="8.5" font-family="'Geist Mono', monospace">[2nd+ call: matching ShapedArray(shape, dtype) → PJRT cache hit]</text>
+
+        <!-- Lifelines: 136, 368, 632, 896 -->
+        <line x1="136" y1="120" x2="136" y2="532" stroke="rgba(15,37,71,0.22)" stroke-width="1" stroke-dasharray="3,3"/>
+        <line x1="368" y1="120" x2="368" y2="532" stroke="rgba(15,37,71,0.22)" stroke-width="1" stroke-dasharray="3,3"/>
+        <line x1="632" y1="120" x2="632" y2="532" stroke="rgba(15,37,71,0.22)" stroke-width="1" stroke-dasharray="3,3"/>
+        <line x1="896" y1="120" x2="896" y2="532" stroke="rgba(15,37,71,0.22)" stroke-width="1" stroke-dasharray="3,3"/>
+
+        <!-- Activation Bars -->
+        <rect x="364" y="180" width="8" height="176" fill="rgba(15,37,71,0.08)" stroke="#3B5B8C" stroke-width="0.8"/>
+        <rect x="628" y="220" width="8" height="52" fill="rgba(15,37,71,0.08)" stroke="#3B5B8C" stroke-width="0.8"/>
+        <rect x="892" y="308" width="8" height="44" fill="rgba(15,37,71,0.08)" stroke="#3B5B8C" stroke-width="0.8"/>
+
+        <rect x="364" y="420" width="8" height="80" fill="rgba(15,37,71,0.08)" stroke="#3B5B8C" stroke-width="0.8"/>
+        <rect x="892" y="444" width="8" height="48" fill="rgba(197,146,22,0.16)" stroke="#C59216" stroke-width="1"/>
+
+        <!-- Messages Region 1 (1st call) -->
+        <line x1="136" y1="184" x2="364" y2="184" stroke="#3B5B8C" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <line x1="372" y1="224" x2="628" y2="224" stroke="#3B5B8C" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <line x1="628" y1="268" x2="372" y2="268" stroke="#3B5B8C" stroke-width="1.2" stroke-dasharray="5,4" marker-end="url(#arrow)"/>
+        <line x1="372" y1="312" x2="892" y2="312" stroke="#3B5B8C" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <line x1="892" y1="352" x2="136" y2="352" stroke="#3B5B8C" stroke-width="1.2" stroke-dasharray="5,4" marker-end="url(#arrow)"/>
+
+        <!-- Messages Region 2 (2nd+ call — fast path) -->
+        <line x1="136" y1="424" x2="364" y2="424" stroke="#3B5B8C" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <line x1="372" y1="452" x2="892" y2="452" stroke="#3B5B8C" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <line x1="892" y1="492" x2="136" y2="492" stroke="#C59216" stroke-width="1.5" stroke-dasharray="5,4" marker-end="url(#arrow-accent)"/>
+
+        <!-- Message Labels with Opaque Paper Masks (4px grid, 8px gap above line, <=14 chars, clear of lifelines) -->
+        <rect x="200" y="164" width="104" height="12" rx="2" fill="#F7F6F2"/>
+        <text x="252" y="173" fill="#3B5B8C" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">FN(F32[64,128])</text>
+
+        <rect x="448" y="204" width="104" height="12" rx="2" fill="#F7F6F2"/>
+        <text x="500" y="213" fill="#3B5B8C" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">TRACE JAXPR IR</text>
+
+        <rect x="448" y="248" width="104" height="12" rx="2" fill="#F7F6F2"/>
+        <text x="500" y="257" fill="#3B5B8C" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">CLOSED JAXPR</text>
+
+        <rect x="448" y="292" width="104" height="12" rx="2" fill="#F7F6F2"/>
+        <text x="500" y="301" fill="#3B5B8C" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">COMPILE XLA</text>
+
+        <rect x="448" y="332" width="104" height="12" rx="2" fill="#F7F6F2"/>
+        <text x="500" y="341" fill="#3B5B8C" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">ARRAY RESULT</text>
+
+        <rect x="200" y="404" width="104" height="12" rx="2" fill="#F7F6F2"/>
+        <text x="252" y="413" fill="#3B5B8C" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">FN(F32[64,128])</text>
+
+        <rect x="448" y="432" width="104" height="12" rx="2" fill="#F7F6F2"/>
+        <text x="500" y="441" fill="#3B5B8C" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">CACHED XLA</text>
+
+        <rect x="444" y="472" width="112" height="12" rx="2" fill="#F7F6F2"/>
+        <text x="500" y="481" fill="#9A6F0B" font-size="8" font-family="'Geist Mono', monospace" font-weight="600" text-anchor="middle">FUSED (7.84X)</text>
+
+        <!-- Actor Boxes -->
+        <rect x="56" y="64" width="160" height="56" rx="6" fill="#EFECE6" stroke="#3B5B8C" stroke-width="1.2"/>
+        <rect x="64" y="72" width="32" height="12" rx="2" fill="none" stroke="#3B5B8C" stroke-width="0.8"/>
+        <text x="80" y="81" fill="#3B5B8C" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle">HOST</text>
+        <text x="136" y="96" fill="#0F2547" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Python Caller</text>
+        <text x="136" y="111" fill="#3B5B8C" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">jax.Array inputs</text>
+
+        <rect x="288" y="64" width="160" height="56" rx="6" fill="#EFECE6" stroke="#3B5B8C" stroke-width="1.2"/>
+        <rect x="296" y="72" width="32" height="12" rx="2" fill="none" stroke="#3B5B8C" stroke-width="0.8"/>
+        <text x="312" y="81" fill="#3B5B8C" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle">JIT</text>
+        <text x="368" y="96" fill="#0F2547" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">@jax.jit Dispatcher</text>
+        <text x="368" y="111" fill="#3B5B8C" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">(shape, dtype) cache</text>
+
+        <rect x="552" y="64" width="160" height="56" rx="6" fill="#EFECE6" stroke="#3B5B8C" stroke-width="1.2"/>
+        <rect x="560" y="72" width="32" height="12" rx="2" fill="none" stroke="#3B5B8C" stroke-width="0.8"/>
+        <text x="576" y="81" fill="#3B5B8C" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle">IR</text>
+        <text x="632" y="96" fill="#0F2547" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">JAX Tracer</text>
+        <text x="632" y="111" fill="#3B5B8C" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">ShapedArray → Jaxpr</text>
+
+        <rect x="816" y="64" width="160" height="56" rx="6" fill="rgba(197,146,22,0.12)" stroke="#C59216" stroke-width="1.4"/>
+        <rect x="824" y="72" width="36" height="12" rx="2" fill="none" stroke="#C59216" stroke-width="0.8"/>
+        <text x="842" y="81" fill="#9A6F0B" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle">PJRT</text>
+        <text x="896" y="96" fill="#0F2547" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">OpenXLA &amp; PJRT</text>
+        <text x="896" y="111" fill="#9A6F0B" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">StableHLO → Fused Exec</text>
+
+        <!-- Bottom Legend Strip -->
+        <line x1="44" y1="548" x2="996" y2="548" stroke="rgba(15,37,71,0.14)" stroke-width="0.8"/>
+        <text x="44" y="566" fill="#3B5B8C" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.18em">LEGEND</text>
+
+        <rect x="44" y="580" width="14" height="10" rx="2" fill="rgba(197,146,22,0.12)" stroke="#C59216" stroke-width="1.2"/>
+        <text x="66" y="588" fill="#0F2547" font-size="9" font-family="'Geist', sans-serif">Focal PJRT runtime</text>
+
+        <rect x="212" y="576" width="6" height="16" fill="rgba(15,37,71,0.08)" stroke="#3B5B8C" stroke-width="0.8"/>
+        <text x="226" y="588" fill="#0F2547" font-size="9" font-family="'Geist', sans-serif">Activation interval</text>
+
+        <line x1="364" y1="585" x2="396" y2="585" stroke="#3B5B8C" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <text x="404" y="588" fill="#0F2547" font-size="9" font-family="'Geist', sans-serif">Synchronous call</text>
+
+        <line x1="536" y1="585" x2="568" y2="585" stroke="#3B5B8C" stroke-width="1.2" stroke-dasharray="5,4" marker-end="url(#arrow)"/>
+        <text x="576" y="588" fill="#0F2547" font-size="9" font-family="'Geist', sans-serif">Return payload</text>
+
+        <line x1="704" y1="585" x2="736" y2="585" stroke="#C59216" stroke-width="1.5" stroke-dasharray="5,4" marker-end="url(#arrow-accent)"/>
+        <text x="744" y="588" fill="#9A6F0B" font-size="9" font-family="'Geist', sans-serif">Cached fast-path return</text>
+      </svg>
+    </div>
+  </div>
+</body>
+</html>

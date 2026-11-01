@@ -1,0 +1,78 @@
+{
+  "environment": {
+    "python_version": "3.12.11",
+    "platform": "macOS-26.6.2-arm64-arm-64bit",
+    "processor": "arm",
+    "jax_version": "0.12.0.1",
+    "torch_version": "2.15.0",
+    "jax_backend": "cpu",
+    "jax_device": "cpu:0"
+  },
+  "experiments": {
+    "01_jit_operator_fusion": {
+      "batch_size": 64,
+      "hidden_dim": 128,
+      "n_iters": 100,
+      "torch_eager_ms": 0.8959,
+      "jax_eager_ms": 1.4055,
+      "jax_jit_ms": 0.1589,
+      "speedup_vs_jax_eager": 8.85,
+      "speedup_vs_torch_eager": 5.64,
+      "max_diff_torch_jit": 3.337860107421875e-06,
+      "max_diff_eager_jit": 2.384185791015625e-06,
+      "jaxpr_num_equations": 168,
+      "stablehlo_lines": 325
+    },
+    "02_pure_functions_pytrees": {
+      "n_steps": 10,
+      "pytree_num_leaves": 9,
+      "treedef_str": "PyTreeDef(CustomNode(namedtuple[TrainState], [CustomNode(namedtuple[LinearBlockParams], [*, *, *, *]), CustomNode(namedtuple[LinearBlockParams], [*, *, *, *]), *]))",
+      "initial_loss_torch": 0.980223,
+      "final_loss_torch": 0.845957,
+      "initial_loss_jax": 0.980223,
+      "final_loss_jax": 0.845957,
+      "max_loss_diff": 1.1920928955078125e-07,
+      "max_w1_diff": 1.4901161193847656e-08,
+      "init_params_unchanged": true
+    },
+    "03_vmap_batching": {
+      "batch_size": 128,
+      "in_dim": 64,
+      "out_dim": 16,
+      "n_iters": 20,
+      "loop_ms": 24.6432,
+      "vmap_ms": 0.1776,
+      "speedup": 138.78,
+      "max_diff_gw": 1.3969838619232178e-09,
+      "max_diff_gb": 9.313225746154785e-10
+    },
+    "04_lax_scan_unrolling": {
+      "seq_len": 500,
+      "batch_size": 32,
+      "hidden_dim": 64,
+      "n_iters": 15,
+      "python_loop_ms": 34.5272,
+      "lax_scan_ms": 2.8744,
+      "speedup": 12.01,
+      "max_diff_final": 0.0,
+      "max_diff_traj": 0.0,
+      "top_level_jaxpr_eqns": 1
+    },
+    "05_dynamic_shapes_trap": {
+      "num_sequences": 24,
+      "buckets": [
+        64,
+        128,
+        256
+      ],
+      "naive_trace_count": 24,
+      "bucket_warmup_traces": 3,
+      "bucket_extra_recompilations": 0,
+      "naive_total_ms": 1061.29,
+      "bucket_total_ms": 19.74,
+      "speedup": 53.76,
+      "max_output_diff": 8.940696716308594e-08
+    }
+  },
+  "all_verifications_passed": true
+}

@@ -1,0 +1,15 @@
+==============================================================================
+THE OUTSIDE JUDGE — JAX vs PyTorch Eager Verification Report
+==============================================================================
+Runtime : Python 3.12.11 | JAX 0.12.0.1 | PyTorch 2.15.0 | Backend: cpu
+------------------------------------------------------------------------------
+Experiment                         | Baseline       | JAX/XLA        | Speedup / Check
+------------------------------------------------------------------------------
+01. @jit Operator Fusion           | 1.4055 ms      | 0.1589 ms      | 8.85x (PASS)   
+02. Pure PyTree vs nn.Module       | loss=0.845957  | loss=0.845957  | Δ=1.5e-08 (PASS)
+03. vmap(grad) Per-Sample Clip     | 24.6432 ms     | 0.1776 ms      | 138.78x (PASS) 
+04. lax.scan 500-Step Rollout      | 34.5272 ms     | 2.8744 ms      | 12.01x (PASS)  
+05. Static Bucket Padding          | 24 compiles    | 0 extra comp   | 53.76x (PASS)  
+------------------------------------------------------------------------------
+Saved JSON report to: benchmarks/latest_results.json
+ALL DETERMINISTIC CHECKS PASSED.
