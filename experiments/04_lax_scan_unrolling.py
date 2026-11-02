@@ -108,7 +108,7 @@ def main() -> None:
     print("Experiment 04: 500-Step Trajectory Unrolling vs jax.lax.scan")
     print("=" * 72)
     print(f"Sequence Length         : {res['seq_len']} steps, batch={res['batch_size']}, dim={res['hidden_dim']}")
-    print(f"Top-Level Jaxpr Eqns    : {res['top_level_jaxpr_eqns']} (single compiled scan primitive)")
+    print(f"Top-Level Jaxpr Eqns    : {res['top_level_jaxpr_eqns']} (one jit call; scan sits inside it)")
     print(f"Python Loop Avg Time    : {res['python_loop_ms']:.4f} ms")
     print(f"jax.lax.scan Avg Time   : {res['lax_scan_ms']:.4f} ms")
     print(f"Compiled Scan Speedup   : {res['speedup']:.2f}x")

@@ -1,6 +1,6 @@
 # JAX & OpenXLA para Desarrolladores PyTorch
 
-- **Por qué es relevante:** Pasar del dispatch imperativo operación por operación a la compilación de grafos completos en OpenXLA permite fusionar operadores en memoria caché del acelerador, vectorizar gradientes por ejemplo sin loops en Python y ejecutar trayectorias secuenciales en un único kernel compilado.
+- **Por qué es relevante:** Pasar del dispatch imperativo operación por operación a la compilación de funciones completas con OpenXLA reduce el dispatch y fusiona operaciones dentro de un solo programa compilado, permite vectorizar gradientes per-sample sin loops en Python y ejecutar trayectorias secuenciales dentro de un solo `while` compilado. Todas las cifras de este repo se midieron en CPU.
 - **Para quién es:** Ingenieros de Machine Learning y desarrolladores que dominan PyTorch (`nn.Module`, `loss.backward()`, `optimizer.step()`) y buscan dominar el modelo mental funcional de JAX (`@jax.jit`, PyTrees, `vmap`, `lax.scan`).
 - **Quién debería verlo:** Equipos técnicos que entrenan o sirven modelos en GPUs y Cloud TPUs y necesitan eliminar cuellos de botella de lanzamiento de kernels y recompilaciones por formas dinámicas.
 - **Serie completa:** Parte de la guía práctica [JAX & OpenXLA Field Guide](https://github.com/ykro/jax-openxla-field-guide).
@@ -11,7 +11,7 @@
 
 ### 1. Eager Dispatch vs Fusión de Operadores con `@jax.jit`
 
-En modo eager, cada operación aritmética lanza un kernel independiente y materializa buffers intermedios en la memoria del dispositivo (HBM). Al decorar con `@jax.jit`, JAX traza la función con `ShapedArray`, genera un `Jaxpr`, lo baja a `StableHLO` y el compilador OpenXLA fusiona las etapas elementwise y de reducción en un solo ejecutable PJRT.
+En modo eager, cada operación se despacha por separado desde Python y materializa sus buffers intermedios en la memoria del dispositivo (HBM en GPU/TPU, RAM en CPU). Al decorar con `@jax.jit`, JAX traza la función con `ShapedArray`, genera un `Jaxpr`, lo baja a `StableHLO` y el compilador OpenXLA produce un solo ejecutable que agrupa las etapas elementwise y de reducción en varias fusiones (en el experimento 01, en CPU, unas tres por vuelta del loop).
 
 ![Eager Dispatch vs Fusión XLA con @jax.jit](diagrams/01-eager-vs-jit.svg)
 
@@ -23,7 +23,7 @@ La primera invocación con una firma `(shape, dtype)` nueva ejecuta el código P
 
 ### 3. Vectorización con `vmap` y Loops Compilados con `lax.scan`
 
-En lugar de iterar en Python sobre ejemplos de un batch o sobre pasos temporales, `jax.vmap` empuja el batch axis hacia las primitivas XLA y `jax.lax.scan` compila recurrencias largas en una única instrucción `WhileOp` que mantiene el estado (`carry`) en registros del acelerador.
+En lugar de iterar en Python sobre ejemplos de un batch o sobre pasos temporales, `jax.vmap` empuja el batch axis hacia las primitivas XLA y `jax.lax.scan` compila recurrencias largas en un solo `stablehlo.while` cuyo estado (`carry`) vive en buffers del dispositivo y no regresa a Python entre pasos.
 
 ![Flujo de datos de vmap y lax.scan](diagrams/03-vmap-scan-dataflow.svg)
 
@@ -31,34 +31,34 @@ En lugar de iterar en Python sobre ejemplos de un batch o sobre pasos temporales
 
 ## Resultados Reales de Verificación (`verify_speedup.py`)
 
-Benchmarks deterministas ejecutados con Python `3.12.11`, JAX `0.12.0.1` y PyTorch `2.15.0`:
+Verificaciones de paridad deterministas; los tiempos son medias de una corrida en CPU y varían entre corridas (±15–20 %). Python `3.12.11`, JAX `0.12.0.1` y PyTorch `2.15.0`. Cada speedup se mide contra su propio baseline: el 01 contra la misma función en JAX eager (PyTorch eager aparece como referencia, sin `torch.compile`), el 03 y el 04 contra loops de Python en JAX, y el 05 excluye del tiempo de buckets sus 3 compilaciones de warmup:
 
-| Experimento | Archivo | Baseline (Eager / Loop) | JAX + OpenXLA | Speedup / Paridad Numérica |
+| Experimento | Archivo | Baseline | JAX + OpenXLA | Speedup / Paridad Numérica |
 | :--- | :--- | :--- | :--- | :--- |
 | **01. `@jax.jit` Operator Fusion** | `experiments/01_jit_operator_fusion.py` | `1.4055 ms` (JAX Eager) / `0.8959 ms` (PyTorch) | `0.1589 ms` (`@jax.jit`) | **8.85x** (`max_diff = 3.34e-06`) |
 | **02. Pure Functions & PyTrees** | `experiments/02_pure_functions_pytrees.py` | `loss = 0.845957` (`nn.Module` + SGD) | `loss = 0.845957` (`NamedTuple` PyTree) | **Paridad exacta** (`ΔW1 = 1.49e-08`) |
 | **03. `vmap(grad)` Per-Sample Clip** | `experiments/03_vmap_batching.py` | `24.6432 ms` (loop Python, `B=128`) | `0.1776 ms` (`vmap(grad)`) | **138.78x** (`max_diff = 1.40e-09`) |
 | **04. `lax.scan` 500-Step Rollout** | `experiments/04_lax_scan_unrolling.py` | `34.5272 ms` (loop Python, `T=500`) | `2.8744 ms` (`lax.scan`) | **12.01x** (`max_diff = 0.00e+00`) |
-| **05. Static Bucket Padding** | `experiments/05_dynamic_shapes_trap.py` | `24 compilaciones` (`1061.29 ms`) | `0 recompilaciones extra` (`19.74 ms`) | **53.76x** (`max_diff = 8.94e-08`) |
+| **05. Static Bucket Padding** | `experiments/05_dynamic_shapes_trap.py` | `24 compilaciones` (`1061.29 ms`) | `3 compilaciones de warmup fuera del tiempo, 0 extra` (`19.74 ms`) | **53.76x** (`max_diff = 8.94e-08`) |
 
 Salida íntegra de terminal generada por `verify_speedup.py`:
 
 ```text
 ==============================================================================
-THE OUTSIDE JUDGE — JAX vs PyTorch Eager Verification Report
+THE OUTSIDE JUDGE — jit, vmap, scan and buckets vs their baselines
 ==============================================================================
 Runtime : Python 3.12.11 | JAX 0.12.0.1 | PyTorch 2.15.0 | Backend: cpu
 ------------------------------------------------------------------------------
 Experiment                         | Baseline       | JAX/XLA        | Speedup / Check
 ------------------------------------------------------------------------------
-01. @jit Operator Fusion           | 1.4055 ms      | 0.1589 ms      | 8.85x (PASS)   
+01. jit vs JAX eager               | 1.4055 ms      | 0.1589 ms      | 8.85x (PASS)   
 02. Pure PyTree vs nn.Module       | loss=0.845957  | loss=0.845957  | Δ=1.5e-08 (PASS)
-03. vmap(grad) Per-Sample Clip     | 24.6432 ms     | 0.1776 ms      | 138.78x (PASS) 
-04. lax.scan 500-Step Rollout      | 34.5272 ms     | 2.8744 ms      | 12.01x (PASS)  
-05. Static Bucket Padding          | 24 compiles    | 0 extra comp   | 53.76x (PASS)  
+03. vmap(grad) vs Python loop      | 24.6432 ms     | 0.1776 ms      | 138.78x (PASS) 
+04. lax.scan vs Python loop        | 34.5272 ms     | 2.8744 ms      | 12.01x (PASS)  
+05. Buckets (warmup excluded)      | 24 compiles    | 0 extra comp   | 53.76x (PASS)  
 ------------------------------------------------------------------------------
 Saved JSON report to: benchmarks/latest_results.json
-ALL DETERMINISTIC CHECKS PASSED.
+ALL CHECKS PASSED (parity checks are deterministic; timings vary run to run).
 ```
 
 ---
@@ -118,7 +118,7 @@ python experiments/02_pure_functions_pytrees.py
 # Paso 3 — Vectorización de gradientes per-sample con jax.vmap(jax.grad)
 python experiments/03_vmap_batching.py
 
-# Paso 4 — Loops recurrentes compilados en una sola primitiva con jax.lax.scan
+# Paso 4 — Loops recurrentes compilados en un solo while con jax.lax.scan
 python experiments/04_lax_scan_unrolling.py
 
 # Paso 5 — Trampa de formas dinámicas y solución con static bucket padding
@@ -137,7 +137,7 @@ make all
 
 ### 4. Ejecución on-demand en Google Cloud (Cloud TPU v5e o NVIDIA L4 GPU)
 
-El script `gcp/run_gpu_tpu_benchmark.sh` aprovisiona una Cloud TPU `v5litepod-1` (o un Custom Job en Vertex AI con GPU NVIDIA L4) en tu propio proyecto de Google Cloud (variable `GCP_PROJECT_ID`) y garantiza la destrucción automática de la instancia mediante `trap cleanup EXIT`.
+El script `gcp/run_gpu_tpu_benchmark.sh` aprovisiona una Cloud TPU `v5litepod-1` (o un Custom Job en Vertex AI con GPU NVIDIA L4) en tu propio proyecto de Google Cloud (variable `GCP_PROJECT_ID`) y garantiza la destrucción automática de la instancia mediante `trap cleanup EXIT`. El script está listo, pero este repo todavía no publica cifras de TPU ni de GPU.
 
 ```bash
 # Ejecutar benchmark en Cloud TPU v5e-1 on-demand (us-central1-a)

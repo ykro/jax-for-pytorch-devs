@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg viewBox="0 0 728 436" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="vmap-scan-title vmap-scan-desc" id="d-03-vmap-scan-dataflow-root">
         <title id="vmap-scan-title">vmap and lax.scan compiler dataflow</title>
-        <desc id="vmap-scan-desc">Dataflow across Python Host, JAX Tracer, OpenXLA Compiler, and Accelerator HBM showing how vmap pushes batch dimensions into primitives and lax.scan lowers sequential loops into an in-register XLA WhileOp.</desc>
+        <desc id="vmap-scan-desc">Dataflow across Python Host, JAX Tracer, OpenXLA Compiler, and Accelerator HBM showing how vmap pushes batch dimensions into primitives and lax.scan lowers sequential loops into a single compiled XLA while loop whose carry stays in device buffers.</desc>
         <defs>
       <style>@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&amp;family=Geist:wght@400;500;600&amp;family=Geist+Mono:wght@400;500;600&amp;family=Noto+Serif:ital@0;1&amp;family=Noto+Sans+KR:wght@400;500;600&amp;family=Noto+Serif+KR:wght@400&amp;family=Noto+Sans+TC:wght@400;500;600&amp;family=Noto+Serif+TC:wght@400&amp;display=swap');
       #d-03-vmap-scan-dataflow-root { --paper: #F7F6F2; --paper-2: #EFECE6; --ink: #0F2547; --muted: #3B5B8C;
@@ -83,14 +83,14 @@
         <!-- Node 3: OpenXLA / lax.scan WhileOp (FOCAL) -->
         <rect x="370" y="204" width="100" height="64" rx="6" fill="#c59216" fill-opacity="0.12" stroke="#C59216" stroke-width="1.4"/>
         <rect x="374" y="208" width="18" height="10" rx="3" fill="#c59216" fill-opacity="0.22"/><text x="383" y="213" class="role-text focal-text">XLA</text>
-        <text x="420" y="227" class="node-title">lax.scan Loop</text><text x="420" y="239" class="node-sub">500 steps → 1 op</text><text x="420" y="251" class="node-tool">StableHLO WhileOp</text>
+        <text x="420" y="227" class="node-title">lax.scan Loop</text><text x="420" y="239" class="node-sub">500 steps → 1 while</text><text x="420" y="251" class="node-tool">StableHLO WhileOp</text>
         <rect x="374" y="258" width="16" height="8" rx="3" fill="#b8915a"/><text x="382" y="264" class="chip-text">TB</text>
         <rect x="450" y="258" width="16" height="8" rx="3" fill="#b8915a"/><text x="458" y="264" class="chip-text">TB</text>
 
         <!-- Node 4: OpenXLA / Operator Fusion -->
         <rect x="482" y="204" width="100" height="64" rx="6" fill="#EFECE6" stroke="#0f2547" stroke-opacity="0.28"/>
         <rect x="486" y="208" width="18" height="10" rx="3" fill="#0f2547" fill-opacity="0.12"/><text x="495" y="213" class="role-text">XLA</text>
-        <text x="532" y="227" class="node-title">Loop Fusion</text><text x="532" y="239" class="node-sub">carry in registers</text><text x="532" y="251" class="node-tool">zero host sync</text>
+        <text x="532" y="227" class="node-title">Loop Fusion</text><text x="532" y="239" class="node-sub">carry in device buffers</text><text x="532" y="251" class="node-tool">zero host sync</text>
         <rect x="486" y="258" width="16" height="8" rx="3" fill="#b8915a"/><text x="494" y="264" class="chip-text">TB</text>
         <rect x="562" y="258" width="16" height="8" rx="3" fill="#b8915a"/><text x="570" y="264" class="chip-text">TB</text>
 

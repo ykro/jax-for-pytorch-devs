@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg viewBox="0 0 1200 660" xmlns="http://www.w3.org/2000/svg" data-diagram="architecture-delta" role="img" aria-labelledby="eager-vs-jit-title eager-vs-jit-desc" id="d-01-eager-vs-jit-root">
         <title id="eager-vs-jit-title">Eager kernel dispatch vs @jax.jit XLA fusion</title>
-        <desc id="eager-vs-jit-desc">Architecture delta comparing eager operator-by-operator dispatch with intermediate HBM roundtrips against a single XLA-fused PJRT kernel under @jax.jit.</desc>
+        <desc id="eager-vs-jit-desc">Architecture delta comparing eager operator-by-operator dispatch with intermediate buffer roundtrips against one compiled XLA executable with several fusions under @jax.jit.</desc>
         <defs>
       <style>@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&amp;family=Geist:wght@400;500;600&amp;family=Geist+Mono:wght@400;500;600&amp;family=Noto+Serif:ital@0;1&amp;family=Noto+Sans+KR:wght@400;500;600&amp;family=Noto+Serif+KR:wght@400&amp;family=Noto+Sans+TC:wght@400;500;600&amp;family=Noto+Serif+TC:wght@400&amp;display=swap');
       #d-01-eager-vs-jit-root { --color-paper: #F7F6F2;
@@ -24,11 +24,11 @@
         </defs>
         <rect width="1200" height="660" fill="#F7F6F2"/>
         <text x="24" y="28" fill="#0F2547" font-size="14" font-family="'Geist', sans-serif" font-weight="600">Before · Eager Dispatch</text>
-        <text x="24" y="50" fill="#3B5B8C" font-size="10" font-family="'Geist', sans-serif">Unfused kernels + intermediate HBM buffers</text>
+        <text x="24" y="50" fill="#3B5B8C" font-size="10" font-family="'Geist', sans-serif">Unfused ops + intermediate device buffers</text>
         <text x="424" y="28" fill="#0F2547" font-size="14" font-family="'Geist', sans-serif" font-weight="600">Changes Ledger</text>
         <text x="424" y="50" fill="#3B5B8C" font-size="10" font-family="'Geist', sans-serif">Whole-graph XLA compilation delta</text>
         <text x="840" y="28" fill="#0F2547" font-size="14" font-family="'Geist', sans-serif" font-weight="600">After · @jax.jit XLA Fusion</text>
-        <text x="840" y="50" fill="#3B5B8C" font-size="10" font-family="'Geist', sans-serif">Single fused PJRT executable in registers</text>
+        <text x="840" y="50" fill="#3B5B8C" font-size="10" font-family="'Geist', sans-serif">One compiled executable, several fusions</text>
         <path d="M 392 8 V 568 M 808 8 V 568" stroke="#0f2547" stroke-opacity="0.14" stroke-width="1"/>
 
         <g data-snapshot="before" transform="translate(24 88)" data-grid="336 480 4">
@@ -42,7 +42,7 @@
           <rect x="176" y="168" width="96" height="16" rx="2" fill="#F7F6F2"/>
           <text x="180" y="180" fill="#3B5B8C" font-size="8" font-family="'Geist Mono', monospace">r2 · REWIRED</text>
           <rect x="176" y="272" width="108" height="16" rx="2" fill="#F7F6F2"/>
-          <text x="180" y="284" fill="#3B5B8C" font-size="8" font-family="'Geist Mono', monospace">r3 · HBM SPILL</text>
+          <text x="180" y="284" fill="#3B5B8C" font-size="8" font-family="'Geist Mono', monospace">r3 · TEMP BUFFERS</text>
           <rect x="176" y="384" width="96" height="16" rx="2" fill="#F7F6F2"/>
           <text x="180" y="396" fill="#3B5B8C" font-size="8" font-family="'Geist Mono', monospace">r5 · RESULT</text>
 
@@ -58,7 +58,7 @@
             <path d="M 85 108 V 148" fill="none" stroke="#C59216" stroke-width="3"/>
             <text x="96" y="112" fill="#9A6F0B" font-size="7.5" font-family="'Geist Mono', monospace">~ dispatch · CHANGED</text>
             <text x="96" y="132" fill="#0F2547" font-size="12" font-family="'Geist', sans-serif" font-weight="600">Dispatcher</text>
-            <text x="96" y="148" fill="#9A6F0B" font-size="9" font-family="'Geist Mono', monospace">eager · 104 op calls</text>
+            <text x="96" y="148" fill="#9A6F0B" font-size="9" font-family="'Geist Mono', monospace">eager · 168 op calls</text>
           </g>
 
           <g data-kind="component" data-object-id="unfused" data-status="removed" data-signature="kernels:unfused:v1">
@@ -94,11 +94,11 @@
         <path d="M 456 202 H 776" stroke="#0f2547" stroke-opacity="0.14" stroke-width="0.8"/>
 
         <text x="424" y="226" fill="#3B5B8C" font-size="9" font-family="'Geist Mono', monospace">03</text>
-        <text x="456" y="224" data-change="ADDED" data-target="fused" fill="#9A6F0B" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.06em">ADDED · fused<tspan x="456" y="246" fill="#0F2547" font-size="11.5" font-family="'Geist', sans-serif" letter-spacing="0">Compile single XLA fused PJRT kernel</tspan></text>
+        <text x="456" y="224" data-change="ADDED" data-target="fused" fill="#9A6F0B" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.06em">ADDED · fused<tspan x="456" y="246" fill="#0F2547" font-size="11.5" font-family="'Geist', sans-serif" letter-spacing="0">Compile one XLA executable with fusions</tspan></text>
         <path d="M 456 262 H 776" stroke="#0f2547" stroke-opacity="0.14" stroke-width="0.8"/>
 
         <text x="424" y="286" fill="#3B5B8C" font-size="9" font-family="'Geist Mono', monospace">04</text>
-        <text x="456" y="284" data-change="CHANGED" data-target="hbm" fill="#3B5B8C" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.06em">CHANGED · hbm<tspan x="456" y="306" fill="#0F2547" font-size="11.5" font-family="'Geist', sans-serif" letter-spacing="0">HBM temp buffers → single final write</tspan></text>
+        <text x="456" y="284" data-change="CHANGED" data-target="hbm" fill="#3B5B8C" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.06em">CHANGED · hbm<tspan x="456" y="306" fill="#0F2547" font-size="11.5" font-family="'Geist', sans-serif" letter-spacing="0">Temp buffers → far fewer writes</tspan></text>
         <path d="M 456 322 H 776" stroke="#0f2547" stroke-opacity="0.14" stroke-width="0.8"/>
 
         <text x="424" y="346" fill="#3B5B8C" font-size="9" font-family="'Geist Mono', monospace">05</text>
@@ -106,11 +106,11 @@
         <path d="M 456 382 H 776" stroke="#0f2547" stroke-opacity="0.14" stroke-width="0.8"/>
 
         <text x="424" y="406" fill="#3B5B8C" font-size="9" font-family="'Geist Mono', monospace">06</text>
-        <text x="456" y="404" data-change="REMOVED" data-target="r3" fill="#3B5B8C" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.06em">REMOVED · r3<tspan x="456" y="426" fill="#0F2547" font-size="11.5" font-family="'Geist', sans-serif" letter-spacing="0">Remove intermediate HBM spills</tspan></text>
+        <text x="456" y="404" data-change="REMOVED" data-target="r3" fill="#3B5B8C" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.06em">REMOVED · r3<tspan x="456" y="426" fill="#0F2547" font-size="11.5" font-family="'Geist', sans-serif" letter-spacing="0">Fewer intermediate buffer round trips</tspan></text>
         <path d="M 456 442 H 776" stroke="#0f2547" stroke-opacity="0.14" stroke-width="0.8"/>
 
         <text x="424" y="466" fill="#3B5B8C" font-size="9" font-family="'Geist Mono', monospace">07</text>
-        <text x="456" y="464" data-change="ADDED" data-target="r4" fill="#3B5B8C" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.06em">ADDED · r4<tspan x="456" y="486" fill="#0F2547" font-size="11.5" font-family="'Geist', sans-serif" letter-spacing="0">Fused register pipeline → HBM output</tspan></text>
+        <text x="456" y="464" data-change="ADDED" data-target="r4" fill="#3B5B8C" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.06em">ADDED · r4<tspan x="456" y="486" fill="#0F2547" font-size="11.5" font-family="'Geist', sans-serif" letter-spacing="0">Fused stages → device memory output</tspan></text>
 
         <text x="424" y="536" fill="#3B5B8C" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.14em">PRESERVED</text>
         <text x="424" y="554" fill="#3B5B8C" font-size="11" font-family="'Geist', sans-serif">Python caller · Output array · r1 · r5</text>
@@ -149,8 +149,8 @@
             <rect data-role="bounds" x="84" y="192" width="168" height="64" rx="6" fill="#c59216" fill-opacity="0.12" stroke="#C59216" stroke-width="1.4"/>
             <rect x="88" y="196" width="160" height="56" rx="4" fill="none" stroke="#C59216" stroke-width="0.8"/>
             <text x="96" y="208" fill="#9A6F0B" font-size="7.5" font-family="'Geist Mono', monospace">+ fused · ADDED</text>
-            <text x="96" y="228" fill="#0F2547" font-size="12" font-family="'Geist', sans-serif" font-weight="600">XLA Fused Kernel</text>
-            <text x="96" y="244" fill="#9A6F0B" font-size="9" font-family="'Geist Mono', monospace">registers · 1 launch</text>
+            <text x="96" y="228" fill="#0F2547" font-size="12" font-family="'Geist', sans-serif" font-weight="600">XLA Executable</text>
+            <text x="96" y="244" fill="#9A6F0B" font-size="9" font-family="'Geist Mono', monospace">~3 fusions per loop</text>
           </g>
 
           <g data-kind="component" data-object-id="hbm" data-status="changed" data-signature="memory:final-only">
@@ -158,7 +158,7 @@
             <path d="M 85 316 V 356" fill="none" stroke="#3B5B8C" stroke-width="3"/>
             <text x="96" y="320" fill="#3B5B8C" font-size="7.5" font-family="'Geist Mono', monospace">~ hbm · CHANGED</text>
             <text x="96" y="340" fill="#0F2547" font-size="12" font-family="'Geist', sans-serif" font-weight="600">Device Memory (HBM)</text>
-            <text x="96" y="356" fill="#3B5B8C" font-size="9" font-family="'Geist Mono', monospace">zero temp buffers</text>
+            <text x="96" y="356" fill="#3B5B8C" font-size="9" font-family="'Geist Mono', monospace">fewer temp buffers</text>
           </g>
 
           <g data-kind="component" data-object-id="output" data-status="unchanged" data-signature="array:output:v1">

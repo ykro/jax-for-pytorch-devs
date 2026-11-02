@@ -1,6 +1,6 @@
 """The Outside Judge: Deterministic Verification & Benchmark Runner.
 
-Executes all 5 JAX vs PyTorch experiments, verifies numerical parity (`allclose`),
+Executes all 5 experiments (JAX, with PyTorch eager as a parity reference), verifies numerical parity (`allclose`),
 asserts >5x speedup on JIT operator fusion, `vmap(grad)`, and `lax.scan`,
 asserts zero extra recompilations with static bucket padding, and writes
 `benchmarks/latest_results.json`.
@@ -82,14 +82,8 @@ def run_all_verifications() -> dict[str, Any]:
     return summary
 
 
-def main() -> None:
-    summary = run_all_verifications()
-    bench_dir = Path(__file__).resolve().parent / "benchmarks"
-    bench_dir.mkdir(parents=True, exist_ok=True)
-    out_json = bench_dir / "latest_results.json"
-    out_txt = bench_dir / "terminal_output.txt"
-    out_json.write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
-
+def format_report(summary: dict[str, Any], json_path: str) -> str:
+    """Render the judge table from a results summary (pure function of the JSON)."""
     env = summary["environment"]
     e01 = summary["experiments"]["01_jit_operator_fusion"]
     e02 = summary["experiments"]["02_pure_functions_pytrees"]
@@ -99,7 +93,7 @@ def main() -> None:
 
     lines = [
         "=" * 78,
-        "THE OUTSIDE JUDGE — JAX vs PyTorch Eager Verification Report",
+        "THE OUTSIDE JUDGE — jit, vmap, scan and buckets vs their baselines",
         "=" * 78,
         (
             f"Runtime : Python {env['python_version']} | JAX {env['jax_version']} | "
@@ -109,7 +103,7 @@ def main() -> None:
         f"{'Experiment':<34} | {'Baseline':<14} | {'JAX/XLA':<14} | {'Speedup / Check':<15}",
         "-" * 78,
         (
-            f"{'01. @jit Operator Fusion':<34} | "
+            f"{'01. jit vs JAX eager':<34} | "
             f"{str(e01['jax_eager_ms']) + ' ms':<14} | "
             f"{str(e01['jax_jit_ms']) + ' ms':<14} | "
             f"{str(e01['speedup_vs_jax_eager']) + 'x (PASS)':<15}"
@@ -125,29 +119,39 @@ def main() -> None:
                 f"{delta_str:<15}"
             ),
             (
-                f"{'03. vmap(grad) Per-Sample Clip':<34} | "
+                f"{'03. vmap(grad) vs Python loop':<34} | "
                 f"{str(e03['loop_ms']) + ' ms':<14} | "
                 f"{str(e03['vmap_ms']) + ' ms':<14} | "
                 f"{str(e03['speedup']) + 'x (PASS)':<15}"
             ),
             (
-                f"{'04. lax.scan 500-Step Rollout':<34} | "
+                f"{'04. lax.scan vs Python loop':<34} | "
                 f"{str(e04['python_loop_ms']) + ' ms':<14} | "
                 f"{str(e04['lax_scan_ms']) + ' ms':<14} | "
                 f"{str(e04['speedup']) + 'x (PASS)':<15}"
             ),
             (
-                f"{'05. Static Bucket Padding':<34} | "
+                f"{'05. Buckets (warmup excluded)':<34} | "
                 f"{str(e05['naive_trace_count']) + ' compiles':<14} | "
                 f"{str(e05['bucket_extra_recompilations']) + ' extra comp':<14} | "
                 f"{str(e05['speedup']) + 'x (PASS)':<15}"
             ),
             "-" * 78,
-            f"Saved JSON report to: {out_json.relative_to(Path(__file__).resolve().parent)}",
-            "ALL DETERMINISTIC CHECKS PASSED.",
+            f"Saved JSON report to: {json_path}",
+            "ALL CHECKS PASSED (parity checks are deterministic; timings vary run to run).",
         ]
     )
-    report = "\n".join(lines)
+    return "\n".join(lines)
+
+
+def main() -> None:
+    summary = run_all_verifications()
+    bench_dir = Path(__file__).resolve().parent / "benchmarks"
+    bench_dir.mkdir(parents=True, exist_ok=True)
+    out_json = bench_dir / "latest_results.json"
+    out_txt = bench_dir / "terminal_output.txt"
+    out_json.write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
+    report = format_report(summary, str(out_json.relative_to(Path(__file__).resolve().parent)))
     out_txt.write_text(report + "\n", encoding="utf-8")
     print(report)
 

@@ -89,7 +89,7 @@
         <text x="500" y="441" fill="#3B5B8C" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">CACHED XLA</text>
 
         <rect x="444" y="472" width="112" height="12" rx="2" fill="#F7F6F2"/>
-        <text x="500" y="481" fill="#9A6F0B" font-size="8" font-family="'Geist Mono', monospace" font-weight="600" text-anchor="middle">FUSED (7.84X)</text>
+        <text x="500" y="481" fill="#9A6F0B" font-size="8" font-family="'Geist Mono', monospace" font-weight="600" text-anchor="middle">8.85X VS EAGER</text>
 
         <!-- Actor Boxes -->
         <rect x="56" y="64" width="160" height="56" rx="6" fill="#EFECE6" stroke="#3B5B8C" stroke-width="1.2"/>

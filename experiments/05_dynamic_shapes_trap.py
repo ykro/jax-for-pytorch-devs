@@ -125,7 +125,7 @@ def main() -> None:
     print(f"Bucketed Warmup Traces    : {res['bucket_warmup_traces']} XLA compilations")
     print(f"Extra Recompilations      : {res['bucket_extra_recompilations']} (0 cache misses in prod)")
     print(f"Bucketed Execution Time   : {res['bucket_total_ms']:.2f} ms")
-    print(f"Latency Speedup           : {res['speedup']:.2f}x")
+    print(f"Latency Speedup           : {res['speedup']:.2f}x (bucket warmup compiles excluded)")
     print(f"Max Masked Output Diff    : {res['max_output_diff']:.2e}")
 
 
