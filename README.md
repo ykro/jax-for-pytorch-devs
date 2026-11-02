@@ -137,7 +137,7 @@ make all
 
 ### 4. Ejecución on-demand en Google Cloud (Cloud TPU v5e o NVIDIA L4 GPU)
 
-El script `gcp/run_gpu_tpu_benchmark.sh` aprovisiona una Cloud TPU `v5litepod-1` (o un Custom Job en Vertex AI con GPU NVIDIA L4) en el proyecto `ai-experiments-487722` y garantiza la destrucción automática de la instancia mediante `trap cleanup EXIT`.
+El script `gcp/run_gpu_tpu_benchmark.sh` aprovisiona una Cloud TPU `v5litepod-1` (o un Custom Job en Vertex AI con GPU NVIDIA L4) en tu propio proyecto de Google Cloud (variable `GCP_PROJECT_ID`) y garantiza la destrucción automática de la instancia mediante `trap cleanup EXIT`.
 
 ```bash
 # Ejecutar benchmark en Cloud TPU v5e-1 on-demand (us-central1-a)
