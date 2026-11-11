@@ -7,7 +7,9 @@ gradients against a single vectorized `jax.jit(jax.vmap(jax.grad(...)))` call.
 
 from __future__ import annotations
 
+import statistics
 import time
+from collections.abc import Callable
 from typing import Any
 
 import jax
@@ -28,6 +30,16 @@ def single_example_loss(
 
 
 single_example_grad = jax.jit(jax.grad(single_example_loss, argnums=(0, 1)))
+
+
+def _median_ms(fn: Callable[[], Any], n_iters: int) -> float:
+    """Median wall time of `fn()` in ms (robust to noisy neighbours on a shared machine)."""
+    times = []
+    for _ in range(n_iters):
+        t0 = time.perf_counter()
+        fn()
+        times.append((time.perf_counter() - t0) * 1000.0)
+    return statistics.median(times)
 
 
 def loop_per_sample_clipped_grads(
@@ -83,19 +95,16 @@ def run_benchmark(batch_size: int = 128, in_dim: int = 64, out_dim: int = 16, n_
     max_diff_gw = float(np.max(np.abs(np.asarray(gw_loop) - np.asarray(gw_vmap))))
     max_diff_gb = float(np.max(np.abs(np.asarray(gb_loop) - np.asarray(gb_vmap))))
 
-    # Measure Python loop
-    t0 = time.perf_counter()
-    for _ in range(n_iters):
-        gw_l, _ = loop_per_sample_clipped_grads(w, b, x_batch, y_batch)
-        gw_l.block_until_ready()
-    loop_ms = ((time.perf_counter() - t0) / n_iters) * 1000.0
+    # Median per call after the warmup above
+    loop_ms = _median_ms(
+        lambda: loop_per_sample_clipped_grads(w, b, x_batch, y_batch)[0].block_until_ready(), n_iters
+    )
+    vmap_ms = _median_ms(
+        lambda: vmap_per_sample_clipped_grads(w, b, x_batch, y_batch)[0].block_until_ready(), n_iters
+    )
 
-    # Measure vmap(grad)
-    t0 = time.perf_counter()
-    for _ in range(n_iters):
-        gw_v, _ = vmap_per_sample_clipped_grads(w, b, x_batch, y_batch)
-        gw_v.block_until_ready()
-    vmap_ms = ((time.perf_counter() - t0) / n_iters) * 1000.0
+    # Ops the Python loop dispatches one by one (top-level Jaxpr equations when traced) vs one jit call
+    loop_traced_ops = len(jax.make_jaxpr(loop_per_sample_clipped_grads)(w, b, x_batch, y_batch).jaxpr.eqns)
 
     return {
         "batch_size": batch_size,
@@ -107,20 +116,29 @@ def run_benchmark(batch_size: int = 128, in_dim: int = 64, out_dim: int = 16, n_
         "speedup": round(loop_ms / vmap_ms, 2),
         "max_diff_gw": max_diff_gw,
         "max_diff_gb": max_diff_gb,
+        "loop_traced_ops": loop_traced_ops,
     }
 
 
+def report(res: dict[str, Any]) -> str:
+    """Human-readable report of one run (printed by main() and by verify_speedup.py --verbose)."""
+    lines = [
+        "=" * 72,
+        "Experiment 03: Per-Sample Gradients with jax.vmap(jax.grad(...))",
+        "=" * 72,
+        f"Batch Size              : {res['batch_size']} examples ({res['in_dim']} -> {res['out_dim']})",
+        f"Python Loop Ops         : {res['loop_traced_ops']} small ops dispatched (128 jit calls + eager clipping)",
+        f"Python Loop Median Time : {res['loop_ms']:.4f} ms",
+        f"vmap(grad) Median Time  : {res['vmap_ms']:.4f} ms",
+        f"Vectorized Speedup      : {res['speedup']:.2f}x",
+        f"Max |Grad W| Difference : {res['max_diff_gw']:.2e}",
+        f"Max |Grad b| Difference : {res['max_diff_gb']:.2e}",
+    ]
+    return "\n".join(lines)
+
+
 def main() -> None:
-    res = run_benchmark()
-    print("=" * 72)
-    print("Experiment 03: Per-Sample Gradients with jax.vmap(jax.grad(...))")
-    print("=" * 72)
-    print(f"Batch Size              : {res['batch_size']} examples ({res['in_dim']} -> {res['out_dim']})")
-    print(f"Python For-Loop Avg Time: {res['loop_ms']:.4f} ms")
-    print(f"jax.vmap(grad) Avg Time : {res['vmap_ms']:.4f} ms")
-    print(f"Vectorized Speedup      : {res['speedup']:.2f}x")
-    print(f"Max |Grad W| Difference : {res['max_diff_gw']:.2e}")
-    print(f"Max |Grad b| Difference : {res['max_diff_gb']:.2e}")
+    print(report(run_benchmark()))
 
 
 if __name__ == "__main__":

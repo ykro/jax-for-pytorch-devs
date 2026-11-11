@@ -2,9 +2,13 @@ PYTHON ?= $(shell if [ -x ../../.venv-shared/bin/python ]; then echo ../../.venv
 PYTEST ?= $(shell if [ -x ../../.venv-shared/bin/pytest ]; then echo ../../.venv-shared/bin/pytest; else command -v pytest; fi)
 RUFF ?= $(shell if [ -x ../../.venv-shared/bin/ruff ]; then echo ../../.venv-shared/bin/ruff; else command -v ruff; fi)
 
-.PHONY: all experiments verify test lint clean gcp-gpu gcp-tpu
+.PHONY: all report experiments verify test lint clean gcp-gpu gcp-tpu
 
 all: lint test verify
+
+# Same as all, but the judge also prints each experiment's report from its single run
+report: lint test
+	$(PYTHON) verify_speedup.py --verbose
 
 experiments:
 	$(PYTHON) experiments/01_jit_operator_fusion.py

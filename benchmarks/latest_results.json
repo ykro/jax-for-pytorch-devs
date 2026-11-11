@@ -6,22 +6,35 @@
     "jax_version": "0.12.0.1",
     "torch_version": "2.15.0",
     "jax_backend": "cpu",
-    "jax_device": "cpu:0"
+    "jax_device": "cpu:0",
+    "cpu_count": 10,
+    "timing": "median per call after warmup (01, 03, 04); single pass (05)",
+    "load_average_before": [
+      5.53,
+      6.69,
+      9.3
+    ],
+    "load_average_after": [
+      5.48,
+      6.67,
+      9.28
+    ]
   },
   "experiments": {
     "01_jit_operator_fusion": {
       "batch_size": 64,
       "hidden_dim": 128,
       "n_iters": 100,
-      "torch_eager_ms": 0.8959,
-      "jax_eager_ms": 1.4055,
-      "jax_jit_ms": 0.1589,
-      "speedup_vs_jax_eager": 8.85,
-      "speedup_vs_torch_eager": 5.64,
+      "torch_eager_ms": 0.8348,
+      "jax_eager_ms": 1.4469,
+      "jax_jit_ms": 0.147,
+      "speedup_vs_jax_eager": 9.85,
+      "speedup_vs_torch_eager": 5.68,
       "max_diff_torch_jit": 3.337860107421875e-06,
       "max_diff_eager_jit": 2.384185791015625e-06,
       "jaxpr_num_equations": 168,
-      "stablehlo_lines": 325
+      "stablehlo_lines": 325,
+      "xla_fusions": 24
     },
     "02_pure_functions_pytrees": {
       "n_steps": 10,
@@ -40,23 +53,26 @@
       "in_dim": 64,
       "out_dim": 16,
       "n_iters": 20,
-      "loop_ms": 24.6432,
-      "vmap_ms": 0.1776,
-      "speedup": 138.78,
+      "loop_ms": 23.5479,
+      "vmap_ms": 0.0854,
+      "speedup": 275.75,
       "max_diff_gw": 1.3969838619232178e-09,
-      "max_diff_gb": 9.313225746154785e-10
+      "max_diff_gb": 9.313225746154785e-10,
+      "loop_traced_ops": 2054
     },
     "04_lax_scan_unrolling": {
       "seq_len": 500,
       "batch_size": 32,
       "hidden_dim": 64,
       "n_iters": 15,
-      "python_loop_ms": 34.5272,
-      "lax_scan_ms": 2.8744,
-      "speedup": 12.01,
+      "python_loop_ms": 28.7024,
+      "lax_scan_ms": 2.8633,
+      "speedup": 10.02,
       "max_diff_final": 0.0,
       "max_diff_traj": 0.0,
-      "top_level_jaxpr_eqns": 1
+      "top_level_jaxpr_eqns": 1,
+      "python_loop_traced_ops": 1501,
+      "stablehlo_while_ops": 1
     },
     "05_dynamic_shapes_trap": {
       "num_sequences": 24,
@@ -68,10 +84,13 @@
       "naive_trace_count": 24,
       "bucket_warmup_traces": 3,
       "bucket_extra_recompilations": 0,
-      "naive_total_ms": 1061.29,
-      "bucket_total_ms": 19.74,
-      "speedup": 53.76,
-      "max_output_diff": 8.940696716308594e-08
+      "naive_total_ms": 1173.93,
+      "bucket_total_ms": 20.19,
+      "speedup": 58.15,
+      "max_output_diff": 8.940696716308594e-08,
+      "real_tokens": 3048,
+      "padded_tokens": 4224,
+      "padding_fraction": 0.2784
     }
   },
   "all_verifications_passed": true

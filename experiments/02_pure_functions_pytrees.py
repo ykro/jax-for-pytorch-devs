@@ -141,17 +141,24 @@ def run_experiment(n_steps: int = 10) -> dict[str, Any]:
     }
 
 
+def report(res: dict[str, Any]) -> str:
+    """Human-readable report of one run (printed by main() and by verify_speedup.py --verbose)."""
+    lines = [
+        "=" * 72,
+        "Experiment 02: Pure Functions & PyTrees vs Stateful nn.Module",
+        "=" * 72,
+        f"PyTree Leaf Count       : {res['pytree_num_leaves']} leaves (params + velocity + step)",
+        f"Init Params Unmutated   : {res['init_params_unchanged']} (zero in-place side effects)",
+        f"PyTorch Loss (step 1->{res['n_steps']}): {res['initial_loss_torch']:.6f} -> {res['final_loss_torch']:.6f}",
+        f"JAX Loss     (step 1->{res['n_steps']}): {res['initial_loss_jax']:.6f} -> {res['final_loss_jax']:.6f}",
+        f"Max Loss Trajectory Diff: {res['max_loss_diff']:.2e}",
+        f"Max Parameter |W1| Diff : {res['max_w1_diff']:.2e}",
+    ]
+    return "\n".join(lines)
+
+
 def main() -> None:
-    res = run_experiment()
-    print("=" * 72)
-    print("Experiment 02: Pure Functions & PyTrees vs Stateful nn.Module")
-    print("=" * 72)
-    print(f"PyTree Leaf Count       : {res['pytree_num_leaves']} leaves (params + velocity + step)")
-    print(f"Init Params Unmutated   : {res['init_params_unchanged']} (zero in-place side effects)")
-    print(f"PyTorch Loss (0 -> {res['n_steps']}) : {res['initial_loss_torch']:.6f} -> {res['final_loss_torch']:.6f}")
-    print(f"JAX Loss     (0 -> {res['n_steps']}) : {res['initial_loss_jax']:.6f} -> {res['final_loss_jax']:.6f}")
-    print(f"Max Loss Trajectory Diff: {res['max_loss_diff']:.2e}")
-    print(f"Max Parameter |W1| Diff : {res['max_w1_diff']:.2e}")
+    print(report(run_experiment()))
 
 
 if __name__ == "__main__":

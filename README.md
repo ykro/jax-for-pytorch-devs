@@ -133,6 +133,9 @@ python verify_speedup.py
 
 # Ejecutar ruff, pytest (5 tests) y verify_speedup.py en un solo comando
 make all
+
+# Lo mismo, y además el reporte de cada experimento, todo de una sola corrida
+make report
 ```
 
 ### 4. Ejecución on-demand en Google Cloud (Cloud TPU v5e o NVIDIA L4 GPU)

@@ -18,6 +18,7 @@ def test_01_jit_operator_fusion() -> None:
     assert res["speedup_vs_jax_eager"] >= 5.0
     assert res["jaxpr_num_equations"] > 20
     assert res["stablehlo_lines"] > 10
+    assert res["xla_fusions"] > 1  # one executable, several fusions inside
 
 
 def test_02_pure_functions_pytrees() -> None:
@@ -41,6 +42,8 @@ def test_04_lax_scan_unrolling() -> None:
     assert res["max_diff_traj"] < 1e-5
     assert res["speedup"] >= 5.0
     assert res["top_level_jaxpr_eqns"] == 1
+    assert res["stablehlo_while_ops"] == 1
+    assert res["python_loop_traced_ops"] > 500
 
 
 def test_05_dynamic_shapes_trap() -> None:
@@ -50,3 +53,4 @@ def test_05_dynamic_shapes_trap() -> None:
     assert res["bucket_extra_recompilations"] == 0
     assert res["max_output_diff"] < 1e-5
     assert res["speedup"] >= 2.0
+    assert res["real_tokens"] == 3048 and res["padded_tokens"] == 4224

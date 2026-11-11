@@ -8,7 +8,10 @@ Also inspects the intermediate Jaxpr and lowered StableHLO MLIR module.
 from __future__ import annotations
 
 import math
+import re
+import statistics
 import time
+from collections.abc import Callable
 from typing import Any
 
 import jax
@@ -44,6 +47,16 @@ def jax_gelu_residual_block(x: jax.Array, scale: jax.Array, bias: jax.Array) -> 
 jax_jit_gelu_residual_block = jax.jit(jax_gelu_residual_block)
 
 
+def _median_ms(fn: Callable[[], Any], n_iters: int) -> float:
+    """Median wall time of `fn()` in ms (robust to noisy neighbours on a shared machine)."""
+    times = []
+    for _ in range(n_iters):
+        t0 = time.perf_counter()
+        fn()
+        times.append((time.perf_counter() - t0) * 1000.0)
+    return statistics.median(times)
+
+
 def run_benchmark(batch_size: int = 64, hidden_dim: int = 128, n_iters: int = 100) -> dict[str, Any]:
     """Run numerical equivalence, IR inspection, and timing comparison."""
     rng = np.random.default_rng(42)
@@ -67,26 +80,21 @@ def run_benchmark(batch_size: int = 64, hidden_dim: int = 128, n_iters: int = 10
     max_diff_torch_jit = float(np.max(np.abs(out_torch.numpy() - np.asarray(out_jax_jit))))
     max_diff_eager_jit = float(np.max(np.abs(np.asarray(out_jax_eager) - np.asarray(out_jax_jit))))
 
-    # Measure PyTorch Eager
-    t0 = time.perf_counter()
-    for _ in range(n_iters):
-        _ = pytorch_gelu_residual_block(x_torch, scale_torch, bias_torch)
-    torch_ms = ((time.perf_counter() - t0) / n_iters) * 1000.0
-
-    # Measure JAX Eager
-    t0 = time.perf_counter()
-    for _ in range(n_iters):
-        _ = jax_gelu_residual_block(x_jax, scale_jax, bias_jax).block_until_ready()
-    jax_eager_ms = ((time.perf_counter() - t0) / n_iters) * 1000.0
-
-    # Measure JAX @jit (XLA fused)
-    t0 = time.perf_counter()
-    for _ in range(n_iters):
-        _ = jax_jit_gelu_residual_block(x_jax, scale_jax, bias_jax).block_until_ready()
-    jax_jit_ms = ((time.perf_counter() - t0) / n_iters) * 1000.0
+    # Median per call after the warmup above (the first jit call, which compiles, is excluded)
+    torch_ms = _median_ms(lambda: pytorch_gelu_residual_block(x_torch, scale_torch, bias_torch), n_iters)
+    jax_eager_ms = _median_ms(
+        lambda: jax_gelu_residual_block(x_jax, scale_jax, bias_jax).block_until_ready(), n_iters
+    )
+    jax_jit_ms = _median_ms(
+        lambda: jax_jit_gelu_residual_block(x_jax, scale_jax, bias_jax).block_until_ready(), n_iters
+    )
 
     jaxpr = jax.make_jaxpr(jax_gelu_residual_block)(x_jax, scale_jax, bias_jax)
-    lowered_hlo = jax_jit_gelu_residual_block.lower(x_jax, scale_jax, bias_jax).as_text("stablehlo")
+    lowered = jax_jit_gelu_residual_block.lower(x_jax, scale_jax, bias_jax)
+    lowered_hlo = lowered.as_text("stablehlo")
+    # Fusions in the optimized program XLA compiles (one executable, several fused kernels inside)
+    compiled_hlo = lowered.compile().as_text()
+    xla_fusions = len(re.findall(r"^\s*(?:ROOT\s+)?%\S+ = \S+ fusion\(", compiled_hlo, re.MULTILINE))
 
     return {
         "batch_size": batch_size,
@@ -101,33 +109,42 @@ def run_benchmark(batch_size: int = 64, hidden_dim: int = 128, n_iters: int = 10
         "max_diff_eager_jit": max_diff_eager_jit,
         "jaxpr_num_equations": len(jaxpr.jaxpr.eqns),
         "stablehlo_lines": len(lowered_hlo.strip().splitlines()),
+        "xla_fusions": xla_fusions,
         "jaxpr_preview": "\n".join(str(jaxpr).splitlines()[:12]),
         "stablehlo_preview": "\n".join(lowered_hlo.strip().splitlines()[:12]),
     }
 
 
+def report(res: dict[str, Any]) -> str:
+    """Human-readable report of one run (printed by main() and by verify_speedup.py --verbose)."""
+    lines = [
+        "=" * 72,
+        "Experiment 01: Eager Dispatch vs @jax.jit XLA Operator Fusion",
+        "=" * 72,
+        f"Backend Device          : {jax.devices()[0].device_kind} ({jax.default_backend()})",
+        f"Tensor Shape            : ({res['batch_size']}, {res['hidden_dim']}) float32",
+        f"Jaxpr Equations Traced  : {res['jaxpr_num_equations']} primitive ops",
+        f"Lowered StableHLO Lines : {res['stablehlo_lines']} lines",
+        f"Compiled XLA Fusions    : {res['xla_fusions']} fusions in one executable (8 residual blocks)",
+        "-" * 72,
+        f"PyTorch Eager Median    : {res['torch_eager_ms']:.4f} ms",
+        f"JAX Eager Median        : {res['jax_eager_ms']:.4f} ms",
+        f"JAX @jit Median         : {res['jax_jit_ms']:.4f} ms",
+        f"Speedup vs JAX Eager    : {res['speedup_vs_jax_eager']:.2f}x",
+        f"Speedup vs PyTorch Eager: {res['speedup_vs_torch_eager']:.2f}x",
+        f"Max |PyTorch - JAX JIT| : {res['max_diff_torch_jit']:.2e}",
+        "-" * 72,
+        "Jaxpr Preview (first 12 lines):",
+        res["jaxpr_preview"],
+        "-" * 72,
+        "StableHLO Preview (first 12 lines):",
+        res["stablehlo_preview"],
+    ]
+    return "\n".join(lines)
+
+
 def main() -> None:
-    res = run_benchmark()
-    print("=" * 72)
-    print("Experiment 01: Eager Dispatch vs @jax.jit XLA Operator Fusion")
-    print("=" * 72)
-    print(f"Backend Device          : {jax.devices()[0].device_kind} ({jax.default_backend()})")
-    print(f"Tensor Shape            : ({res['batch_size']}, {res['hidden_dim']}) float32")
-    print(f"Jaxpr Equations Traced  : {res['jaxpr_num_equations']} primitive ops")
-    print(f"Lowered StableHLO Lines : {res['stablehlo_lines']} lines")
-    print("-" * 72)
-    print(f"PyTorch Eager Avg Time  : {res['torch_eager_ms']:.4f} ms")
-    print(f"JAX Eager Avg Time      : {res['jax_eager_ms']:.4f} ms")
-    print(f"JAX @jit Fused Avg Time : {res['jax_jit_ms']:.4f} ms")
-    print(f"Speedup vs JAX Eager    : {res['speedup_vs_jax_eager']:.2f}x")
-    print(f"Speedup vs PyTorch Eager: {res['speedup_vs_torch_eager']:.2f}x")
-    print(f"Max |PyTorch - JAX JIT| : {res['max_diff_torch_jit']:.2e}")
-    print("-" * 72)
-    print("Jaxpr Preview (first 12 lines):")
-    print(res["jaxpr_preview"])
-    print("-" * 72)
-    print("StableHLO Preview (first 12 lines):")
-    print(res["stablehlo_preview"])
+    print(report(run_benchmark()))
 
 
 if __name__ == "__main__":

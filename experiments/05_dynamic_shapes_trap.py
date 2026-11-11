@@ -60,7 +60,7 @@ def run_experiment() -> dict[str, Any]:
     dim = 128
     w = jnp.asarray(rng.standard_normal((dim, dim), dtype=np.float32) / np.sqrt(dim))
 
-    # 24 distinct sequence lengths between 12 and 250
+    # 24 distinct sequence lengths from 12 to 242 (step 10)
     seq_lengths = [12 + i * 10 for i in range(24)]
     sequences = [rng.standard_normal((length, dim), dtype=np.float32) for length in seq_lengths]
 
@@ -94,6 +94,9 @@ def run_experiment() -> dict[str, Any]:
         bucket_outputs.append(np.asarray(out))
     bucket_total_ms = (time.perf_counter() - t0) * 1000.0
 
+    real_tokens = sum(seq_lengths)
+    padded_total = sum(select_bucket(length) for length in seq_lengths)
+
     extra_recompilations = bucket_stats["trace_count"] - traces_after_warmup
     max_output_diff = float(
         np.max([np.max(np.abs(a - b)) for a, b in zip(naive_outputs, bucket_outputs, strict=True)])
@@ -109,24 +112,35 @@ def run_experiment() -> dict[str, Any]:
         "bucket_total_ms": round(bucket_total_ms, 2),
         "speedup": round(naive_total_ms / bucket_total_ms, 2),
         "max_output_diff": max_output_diff,
+        "real_tokens": real_tokens,
+        "padded_tokens": padded_total,
+        "padding_fraction": round(1 - real_tokens / padded_total, 4),
     }
 
 
+def report(res: dict[str, Any]) -> str:
+    """Human-readable report of one run (printed by main() and by verify_speedup.py --verbose)."""
+    lines = [
+        "=" * 72,
+        "Experiment 05: Dynamic Shapes Recompilation Trap & Bucket Padding",
+        "=" * 72,
+        f"Distinct Sequence Lengths : {res['num_sequences']} sequences (lengths 12..242)",
+        f"Static Buckets Configured : {res['buckets']}",
+        "-" * 72,
+        f"Naive Dynamic Trace Count : {res['naive_trace_count']} XLA compilations",
+        f"Naive Total Execution Time: {res['naive_total_ms']:.2f} ms",
+        f"Bucketed Warmup Traces    : {res['bucket_warmup_traces']} XLA compilations",
+        f"Extra Recompilations      : {res['bucket_extra_recompilations']} (no compiles during traffic)",
+        f"Bucketed Execution Time   : {res['bucket_total_ms']:.2f} ms",
+        f"Tokens Processed (pad)    : {res['padded_tokens']} for {res['real_tokens']} real ({res['padding_fraction'] * 100:.1f}% padding)",
+        f"Latency Speedup           : {res['speedup']:.2f}x (bucket warmup compiles excluded)",
+        f"Max Masked Output Diff    : {res['max_output_diff']:.2e}",
+    ]
+    return "\n".join(lines)
+
+
 def main() -> None:
-    res = run_experiment()
-    print("=" * 72)
-    print("Experiment 05: Dynamic Shapes Recompilation Trap & Bucket Padding")
-    print("=" * 72)
-    print(f"Distinct Sequence Lengths : {res['num_sequences']} sequences (lengths 12..242)")
-    print(f"Static Buckets Configured : {res['buckets']}")
-    print("-" * 72)
-    print(f"Naive Dynamic Trace Count : {res['naive_trace_count']} XLA compilations")
-    print(f"Naive Total Execution Time: {res['naive_total_ms']:.2f} ms")
-    print(f"Bucketed Warmup Traces    : {res['bucket_warmup_traces']} XLA compilations")
-    print(f"Extra Recompilations      : {res['bucket_extra_recompilations']} (0 cache misses in prod)")
-    print(f"Bucketed Execution Time   : {res['bucket_total_ms']:.2f} ms")
-    print(f"Latency Speedup           : {res['speedup']:.2f}x (bucket warmup compiles excluded)")
-    print(f"Max Masked Output Diff    : {res['max_output_diff']:.2e}")
+    print(report(run_experiment()))
 
 
 if __name__ == "__main__":

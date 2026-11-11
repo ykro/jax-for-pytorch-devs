@@ -8,8 +8,10 @@ asserts zero extra recompilations with static bucket padding, and writes
 
 from __future__ import annotations
 
+import argparse
 import importlib
 import json
+import os
 import platform
 from pathlib import Path
 from typing import Any
@@ -24,18 +26,46 @@ exp04 = importlib.import_module("experiments.04_lax_scan_unrolling")
 exp05 = importlib.import_module("experiments.05_dynamic_shapes_trap")
 
 
-def run_all_verifications() -> dict[str, Any]:
-    """Run all 5 experiments and enforce deterministic verification assertions."""
-    r01 = exp01.run_benchmark()
-    r02 = exp02.run_experiment()
-    r03 = exp03.run_benchmark()
-    r04 = exp04.run_benchmark()
-    r05 = exp05.run_experiment()
+def _load_average() -> list[float]:
+    try:
+        return [round(x, 2) for x in os.getloadavg()]
+    except OSError:
+        return []
+
+
+def _load_hint(load: list[float]) -> str:
+    """Extra context for a failed timing check when the machine was busy."""
+    cores = os.cpu_count() or 1
+    if load and load[0] > 0.75 * cores:
+        return (
+            f" (1-min load average was {load[0]:.1f} on {cores} cores; close other heavy processes "
+            "and run again: parity checks are deterministic, timings are not)"
+        )
+    return ""
+
+
+def run_all_verifications(verbose: bool = False) -> dict[str, Any]:
+    """Run all 5 experiments once and enforce deterministic verification assertions.
+
+    With verbose=True, each experiment's report is printed from this same run, so the per-experiment
+    output and the summary table (and the JSON) never mix numbers from different runs.
+    """
+    load_before = _load_average()
+    results = []
+    for mod, fn in ((exp01, "run_benchmark"), (exp02, "run_experiment"), (exp03, "run_benchmark"),
+                    (exp04, "run_benchmark"), (exp05, "run_experiment")):
+        res = getattr(mod, fn)()
+        if verbose:
+            print(mod.report(res) + "\n", flush=True)
+        results.append(res)
+    r01, r02, r03, r04, r05 = results
+    busy = _load_hint(load_before)
 
     # Assertions for Experiment 01: JIT Operator Fusion
     assert r01["max_diff_torch_jit"] < 1e-5, f"Exp01 parity failed: {r01['max_diff_torch_jit']}"
+    assert r01["xla_fusions"] > 1, "Exp01 expected several fusions inside one executable"
     assert r01["speedup_vs_jax_eager"] >= 5.0, (
-        f"Exp01 JIT speedup < 5.0x: {r01['speedup_vs_jax_eager']}x"
+        f"Exp01 JIT speedup < 5.0x: {r01['speedup_vs_jax_eager']}x{busy}"
     )
 
     # Assertions for Experiment 02: Pure Functions & PyTrees
@@ -46,11 +76,12 @@ def run_all_verifications() -> dict[str, Any]:
     # Assertions for Experiment 03: vmap(grad) Per-Example Gradients
     assert r03["max_diff_gw"] < 1e-5, f"Exp03 grad W parity failed: {r03['max_diff_gw']}"
     assert r03["max_diff_gb"] < 1e-5, f"Exp03 grad b parity failed: {r03['max_diff_gb']}"
-    assert r03["speedup"] >= 5.0, f"Exp03 vmap speedup < 5.0x: {r03['speedup']}x"
+    assert r03["speedup"] >= 5.0, f"Exp03 vmap speedup < 5.0x: {r03['speedup']}x{busy}"
 
     # Assertions for Experiment 04: lax.scan Recurrent Trajectory
     assert r04["max_diff_traj"] < 1e-5, f"Exp04 scan parity failed: {r04['max_diff_traj']}"
-    assert r04["speedup"] >= 5.0, f"Exp04 scan speedup < 5.0x: {r04['speedup']}x"
+    assert r04["speedup"] >= 5.0, f"Exp04 scan speedup < 5.0x: {r04['speedup']}x{busy}"
+    assert r04["stablehlo_while_ops"] == 1, "Exp04 expected the 500 steps inside one stablehlo.while"
 
     # Assertions for Experiment 05: Dynamic Shapes & Static Buckets
     assert r05["bucket_extra_recompilations"] == 0, (
@@ -67,6 +98,10 @@ def run_all_verifications() -> dict[str, Any]:
             "torch_version": torch.__version__,
             "jax_backend": jax.default_backend(),
             "jax_device": str(jax.devices()[0]),
+            "cpu_count": os.cpu_count(),
+            "timing": "median per call after warmup (01, 03, 04); single pass (05)",
+            "load_average_before": load_before,
+            "load_average_after": _load_average(),
         },
         "experiments": {
             "01_jit_operator_fusion": {
@@ -80,6 +115,10 @@ def run_all_verifications() -> dict[str, Any]:
         "all_verifications_passed": True,
     }
     return summary
+
+
+def _first(values: list[float]) -> str:
+    return f"{values[0]:.1f}" if values else "n/a"
 
 
 def format_report(summary: dict[str, Any], json_path: str) -> str:
@@ -99,6 +138,10 @@ def format_report(summary: dict[str, Any], json_path: str) -> str:
             f"Runtime : Python {env['python_version']} | JAX {env['jax_version']} | "
             f"PyTorch {env['torch_version']} | Backend: {env['jax_backend']}"
         ),
+        (
+            f"CPU     : {env['cpu_count']} cores | 1-min load average "
+            f"{_first(env['load_average_before'])} before, {_first(env['load_average_after'])} after"
+        ),
         "-" * 78,
         f"{'Experiment':<34} | {'Baseline':<14} | {'JAX/XLA':<14} | {'Speedup / Check':<15}",
         "-" * 78,
@@ -107,6 +150,12 @@ def format_report(summary: dict[str, Any], json_path: str) -> str:
             f"{str(e01['jax_eager_ms']) + ' ms':<14} | "
             f"{str(e01['jax_jit_ms']) + ' ms':<14} | "
             f"{str(e01['speedup_vs_jax_eager']) + 'x (PASS)':<15}"
+        ),
+        (
+            f"{'    jit vs PyTorch eager (reference)':<34} | "
+            f"{str(e01['torch_eager_ms']) + ' ms':<14} | "
+            f"{str(e01['jax_jit_ms']) + ' ms':<14} | "
+            f"{str(e01['speedup_vs_torch_eager']) + 'x (ref)':<15}"
         ),
     ]
     delta_str = f"Δ={e02['max_w1_diff']:.1e} (PASS)"
@@ -131,21 +180,23 @@ def format_report(summary: dict[str, Any], json_path: str) -> str:
                 f"{str(e04['speedup']) + 'x (PASS)':<15}"
             ),
             (
-                f"{'05. Buckets (warmup excluded)':<34} | "
+                f"{'05. Buckets (3 warmups excluded)':<34} | "
                 f"{str(e05['naive_trace_count']) + ' compiles':<14} | "
                 f"{str(e05['bucket_extra_recompilations']) + ' extra comp':<14} | "
                 f"{str(e05['speedup']) + 'x (PASS)':<15}"
             ),
             "-" * 78,
             f"Saved JSON report to: {json_path}",
-            "ALL CHECKS PASSED (parity checks are deterministic; timings vary run to run).",
+            "ALL CHECKS PASSED (parity checks are deterministic; median timings vary run to run).",
         ]
     )
     return "\n".join(lines)
 
 
 def main() -> None:
-    summary = run_all_verifications()
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--verbose", action="store_true", help="print each experiment's report from this same run")
+    summary = run_all_verifications(verbose=parser.parse_args().verbose)
     bench_dir = Path(__file__).resolve().parent / "benchmarks"
     bench_dir.mkdir(parents=True, exist_ok=True)
     out_json = bench_dir / "latest_results.json"
