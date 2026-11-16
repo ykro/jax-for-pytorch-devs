@@ -31,15 +31,15 @@ En lugar de iterar en Python sobre ejemplos de un batch o sobre pasos temporales
 
 ## Resultados Reales de Verificación (`verify_speedup.py`)
 
-Verificaciones de paridad deterministas; los tiempos son medias de una corrida en CPU y varían entre corridas (±15–20 %). Python `3.12.11`, JAX `0.12.0.1` y PyTorch `2.15.0`. Cada speedup se mide contra su propio baseline: el 01 contra la misma función en JAX eager (PyTorch eager aparece como referencia, sin `torch.compile`), el 03 y el 04 contra loops de Python en JAX, y el 05 excluye del tiempo de buckets sus 3 compilaciones de warmup:
+Verificaciones de paridad deterministas; los tiempos son medianas de una corrida en CPU y varían entre corridas (±15–20 %). Python `3.12.11`, JAX `0.12.0.1` y PyTorch `2.15.0`. Cada speedup se mide contra su propio baseline: el 01 contra la misma función en JAX eager (PyTorch eager aparece como referencia, sin `torch.compile`), el 03 y el 04 contra loops de Python en JAX, y el 05 excluye del tiempo de buckets sus 3 compilaciones de warmup:
 
 | Experimento | Archivo | Baseline | JAX + OpenXLA | Speedup / Paridad Numérica |
 | :--- | :--- | :--- | :--- | :--- |
-| **01. `@jax.jit` Operator Fusion** | `experiments/01_jit_operator_fusion.py` | `1.4055 ms` (JAX Eager) / `0.8959 ms` (PyTorch) | `0.1589 ms` (`@jax.jit`) | **8.85x** (`max_diff = 3.34e-06`) |
+| **01. `@jax.jit` Operator Fusion** | `experiments/01_jit_operator_fusion.py` | `1.4469 ms` (JAX Eager) / `0.8348 ms` (PyTorch) | `0.147 ms` (`@jax.jit`) | **9.85x** (`max_diff = 3.34e-06`) |
 | **02. Pure Functions & PyTrees** | `experiments/02_pure_functions_pytrees.py` | `loss = 0.845957` (`nn.Module` + SGD) | `loss = 0.845957` (`NamedTuple` PyTree) | **Paridad exacta** (`ΔW1 = 1.49e-08`) |
-| **03. `vmap(grad)` Per-Sample Clip** | `experiments/03_vmap_batching.py` | `24.6432 ms` (loop Python, `B=128`) | `0.1776 ms` (`vmap(grad)`) | **138.78x** (`max_diff = 1.40e-09`) |
-| **04. `lax.scan` 500-Step Rollout** | `experiments/04_lax_scan_unrolling.py` | `34.5272 ms` (loop Python, `T=500`) | `2.8744 ms` (`lax.scan`) | **12.01x** (`max_diff = 0.00e+00`) |
-| **05. Static Bucket Padding** | `experiments/05_dynamic_shapes_trap.py` | `24 compilaciones` (`1061.29 ms`) | `3 compilaciones de warmup fuera del tiempo, 0 extra` (`19.74 ms`) | **53.76x** (`max_diff = 8.94e-08`) |
+| **03. `vmap(grad)` Per-Sample Clip** | `experiments/03_vmap_batching.py` | `23.5479 ms` (loop Python, `B=128`) | `0.0854 ms` (`vmap(grad)`) | **275.75x** (`max_diff = 1.40e-09`) |
+| **04. `lax.scan` 500-Step Rollout** | `experiments/04_lax_scan_unrolling.py` | `28.7024 ms` (loop Python, `T=500`) | `2.8633 ms` (`lax.scan`) | **10.02x** (`max_diff = 0.00e+00`) |
+| **05. Static Bucket Padding** | `experiments/05_dynamic_shapes_trap.py` | `24 compilaciones` (`1173.93 ms`) | `3 compilaciones de warmup fuera del tiempo, 0 extra` (`20.19 ms`) | **58.15x** (`max_diff = 8.94e-08`) |
 
 Salida íntegra de terminal generada por `verify_speedup.py`:
 
@@ -48,17 +48,19 @@ Salida íntegra de terminal generada por `verify_speedup.py`:
 THE OUTSIDE JUDGE — jit, vmap, scan and buckets vs their baselines
 ==============================================================================
 Runtime : Python 3.12.11 | JAX 0.12.0.1 | PyTorch 2.15.0 | Backend: cpu
+CPU     : 10 cores | 1-min load average 5.5 before, 5.5 after
 ------------------------------------------------------------------------------
 Experiment                         | Baseline       | JAX/XLA        | Speedup / Check
 ------------------------------------------------------------------------------
-01. jit vs JAX eager               | 1.4055 ms      | 0.1589 ms      | 8.85x (PASS)   
+01. jit vs JAX eager               | 1.4469 ms      | 0.147 ms       | 9.85x (PASS)   
+    jit vs PyTorch eager (reference) | 0.8348 ms      | 0.147 ms       | 5.68x (ref)    
 02. Pure PyTree vs nn.Module       | loss=0.845957  | loss=0.845957  | Δ=1.5e-08 (PASS)
-03. vmap(grad) vs Python loop      | 24.6432 ms     | 0.1776 ms      | 138.78x (PASS) 
-04. lax.scan vs Python loop        | 34.5272 ms     | 2.8744 ms      | 12.01x (PASS)  
-05. Buckets (warmup excluded)      | 24 compiles    | 0 extra comp   | 53.76x (PASS)  
+03. vmap(grad) vs Python loop      | 23.5479 ms     | 0.0854 ms      | 275.75x (PASS) 
+04. lax.scan vs Python loop        | 28.7024 ms     | 2.8633 ms      | 10.02x (PASS)  
+05. Buckets (3 warmups excluded)   | 24 compiles    | 0 extra comp   | 58.15x (PASS)  
 ------------------------------------------------------------------------------
 Saved JSON report to: benchmarks/latest_results.json
-ALL CHECKS PASSED (parity checks are deterministic; timings vary run to run).
+ALL CHECKS PASSED (parity checks are deterministic; median timings vary run to run).
 ```
 
 ---
