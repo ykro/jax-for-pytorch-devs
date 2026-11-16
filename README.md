@@ -82,8 +82,10 @@ ALL CHECKS PASSED (parity checks are deterministic; timings vary run to run).
 │   └── 05_dynamic_shapes_trap.py   # Trampa de formas dinámicas y static bucketing
 ├── gcp/
 │   └── run_gpu_tpu_benchmark.sh    # Runner on-demand con auto-teardown en Cloud TPU v5e y Vertex AI L4 GPU
+├── practica/                       # Fragmentos del video de práctica (dos *_roto.py fallan a propósito)
 ├── tests/
-│   └── test_experiments.py         # Suite pytest determinista (5 tests)
+│   ├── test_experiments.py         # Suite pytest determinista (5 tests)
+│   └── test_practica.py            # Un test por fragmento de practica/ (10 tests)
 ├── Makefile
 ├── pyproject.toml
 └── verify_speedup.py               # El Juez Externo (aserciones de paridad y speedup)
@@ -104,7 +106,24 @@ pip install --upgrade pip
 pip install -e ".[dev]"
 ```
 
-### 2. Recorrido guiado paso a paso (Orden de Onboarding)
+### 2. Práctica a mano (los fragmentos del video de práctica)
+
+La carpeta `practica/` tiene los fragmentos cortos que se escriben en el video de práctica. Los dos `*_roto.py` fallan a propósito: el error es parte del ejercicio. Escríbelos tú antes de abrirlos.
+
+```bash
+python practica/01_mutar_roto.py   # TypeError, los arreglos de JAX son inmutables
+python practica/01_mutar.py        # .at[1].set(0.5) devuelve un arreglo nuevo
+python practica/01_paso.py         # un paso de entrenamiento puro con value_and_grad y jax.tree.map
+python practica/02_trazar.py       # el print corre al trazar, una vez por forma y tipo
+python practica/02_if_roto.py      # TracerBoolConversionError, un if sobre un valor trazado
+python practica/02_if.py           # jnp.where decide dentro del programa compilado
+python practica/03_vmap_grad.py    # vmap(grad): un gradiente por ejemplo, recortado antes de promediar
+python practica/04_scan.py         # el for se desenrolla en 2,500 ecuaciones; lax.scan queda en 1
+python practica/04_formas.py       # 7 llamadas con 6 longitudes distintas, 6 compilaciones
+python practica/04_buckets.py      # buckets de 64 y 128 con máscara, 2 compilaciones
+```
+
+### 3. Recorrido guiado paso a paso (Orden de Onboarding)
 
 Ejecuta cada script en orden para observar la transición desde PyTorch Eager hasta OpenXLA compilado.
 
@@ -125,20 +144,20 @@ python experiments/04_lax_scan_unrolling.py
 python experiments/05_dynamic_shapes_trap.py
 ```
 
-### 3. Verificación completa (Linter + Tests + Juez Externo)
+### 4. Verificación completa (Linter + Tests + Juez Externo)
 
 ```bash
 # Ejecutar únicamente el Juez Externo y generar benchmarks/latest_results.json
 python verify_speedup.py
 
-# Ejecutar ruff, pytest (5 tests) y verify_speedup.py en un solo comando
+# Ejecutar ruff, pytest (15 tests) y verify_speedup.py en un solo comando
 make all
 
 # Lo mismo, y además el reporte de cada experimento, todo de una sola corrida
 make report
 ```
 
-### 4. Ejecución on-demand en Google Cloud (Cloud TPU v5e o NVIDIA L4 GPU)
+### 5. Ejecución on-demand en Google Cloud (Cloud TPU v5e o NVIDIA L4 GPU)
 
 El script `gcp/run_gpu_tpu_benchmark.sh` aprovisiona una Cloud TPU `v5litepod-1` (o un Custom Job en Vertex AI con GPU NVIDIA L4) en tu propio proyecto de Google Cloud (variable `GCP_PROJECT_ID`) y garantiza la destrucción automática de la instancia mediante `trap cleanup EXIT`. El script está listo, pero este repo todavía no publica cifras de TPU ni de GPU.
 
