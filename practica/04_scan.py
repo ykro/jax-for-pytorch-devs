@@ -18,6 +18,7 @@ def con_scan(estado):
     return final[0]
 
 inicio = (jnp.array(1.0), jnp.array(0.0))
-print("iguales:", bool(jax.jit(con_for)(inicio) == jax.jit(con_scan)(inicio)))
+a, b = jax.jit(con_for)(inicio), jax.jit(con_scan)(inicio)
+print("iguales:", bool(a == b))
 print("ecuaciones con for: ", len(jax.make_jaxpr(con_for)(inicio).eqns))
 print("ecuaciones con scan:", len(jax.make_jaxpr(con_scan)(inicio).eqns))

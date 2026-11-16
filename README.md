@@ -87,7 +87,7 @@ ALL CHECKS PASSED (parity checks are deterministic; median timings vary run to r
 ├── practica/                       # Fragmentos del video de práctica (dos *_roto.py fallan a propósito)
 ├── tests/
 │   ├── test_experiments.py         # Suite pytest determinista (5 tests)
-│   └── test_practica.py            # Un test por fragmento de practica/ (10 tests)
+│   └── test_practica.py            # Un test por fragmento de practica/ (11 tests)
 ├── Makefile
 ├── pyproject.toml
 └── verify_speedup.py               # El Juez Externo (aserciones de paridad y speedup)
@@ -122,7 +122,7 @@ python practica/02_if.py           # jnp.where decide dentro del programa compil
 python practica/03_vmap_grad.py    # vmap(grad): un gradiente por ejemplo, recortado antes de promediar
 python practica/04_scan.py         # el for se desenrolla en 2,500 ecuaciones; lax.scan queda en 1
 python practica/04_formas.py       # 7 llamadas con 6 longitudes distintas, 6 compilaciones
-python practica/04_buckets.py      # buckets de 64 y 128 con máscara, 2 compilaciones
+python practica/04_buckets.py      # buckets de 64 y 128, 2 compilaciones; sin la máscara el relleno cambia la suma
 ```
 
 ### 3. Recorrido guiado paso a paso (Orden de Onboarding)
@@ -152,7 +152,7 @@ python experiments/05_dynamic_shapes_trap.py
 # Ejecutar únicamente el Juez Externo y generar benchmarks/latest_results.json
 python verify_speedup.py
 
-# Ejecutar ruff, pytest (15 tests) y verify_speedup.py en un solo comando
+# Ejecutar ruff, pytest (16 tests) y verify_speedup.py en un solo comando
 make all
 
 # Lo mismo, y además el reporte de cada experimento, todo de una sola corrida

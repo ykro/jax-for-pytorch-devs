@@ -17,4 +17,4 @@ def paso(params, X, y):
 for i in range(50):
     params, valor = paso(params, X, y)
     if i % 10 == 0:
-        print(f"paso {i:2d}  loss {valor:.4f}")
+        print(f"paso {i} loss {valor:.4f}")

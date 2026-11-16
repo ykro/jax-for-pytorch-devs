@@ -28,6 +28,7 @@ def test_01_mutar_keeps_original() -> None:
 
 def test_01_paso_loss_goes_down() -> None:
     lines = run("01_paso.py").stdout.splitlines()
+    assert lines[0] == "paso 0 loss 13.7775"
     losses = [float(line.split("loss")[1]) for line in lines]
     assert len(losses) == 5
     assert losses[0] > 10.0
@@ -74,6 +75,14 @@ def test_04_formas_compiles_once_per_shape() -> None:
 def test_04_buckets_compile_once_per_bucket() -> None:
     lines = run("04_buckets.py").stdout.splitlines()
     assert lines[0] == "llamadas: 7  compilaciones: 2"
-    a = float(lines[1].removeprefix("con bucket: "))
-    b = float(lines[2].removeprefix("sin relleno:"))
-    assert abs(a - b) < 1e-4
+    con = float(lines[1].removeprefix("con máscara:"))
+    sin_relleno = float(lines[3].removeprefix("sin relleno:"))
+    assert abs(con - sin_relleno) < 1e-4
+
+
+def test_04_buckets_mask_matters() -> None:
+    """cos(0) = 1, so without the mask the 27 padded zeros of the 64 bucket add 27 to the sum."""
+    lines = run("04_buckets.py").stdout.splitlines()
+    con = float(lines[1].removeprefix("con máscara:"))
+    sin = float(lines[2].removeprefix("sin máscara:"))
+    assert abs((sin - con) - 27.0) < 1e-3

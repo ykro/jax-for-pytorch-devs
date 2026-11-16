@@ -7,7 +7,7 @@ trazas = 0
 def resumen(x):
     global trazas
     trazas += 1
-    return jnp.tanh(x).sum()
+    return jnp.cos(x).sum()
 
 for n in [37, 52, 61, 37, 90, 45, 118]:
     resumen(jnp.ones(n))
