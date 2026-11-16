@@ -37,3 +37,6 @@ target-version = "py312"
 [tool.ruff.lint]
 ignore = ["N999"]
 
+
+[tool.setuptools]
+py-modules = []
