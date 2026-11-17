@@ -3,6 +3,7 @@
 - **Por qué es relevante:** Pasar del dispatch imperativo operación por operación a la compilación de funciones completas con OpenXLA reduce el dispatch y fusiona operaciones dentro de un solo programa compilado, permite vectorizar gradientes per-sample sin loops en Python y ejecutar trayectorias secuenciales dentro de un solo `while` compilado. Todas las cifras de este repo se midieron en CPU.
 - **Para quién es:** Ingenieros de Machine Learning y desarrolladores que dominan PyTorch (`nn.Module`, `loss.backward()`, `optimizer.step()`) y buscan dominar el modelo mental funcional de JAX (`@jax.jit`, PyTrees, `vmap`, `lax.scan`).
 - **Quién debería verlo:** Equipos técnicos que entrenan o sirven modelos en GPUs y Cloud TPUs y necesitan eliminar cuellos de botella de lanzamiento de kernels y recompilaciones por formas dinámicas.
+- **Video de práctica:** [jit, vmap y scan escribiendo cada fragmento de `practica/`](https://youtu.be/49o55HV0fPU).
 - **Serie completa:** Parte de la guía práctica [JAX & OpenXLA Field Guide](https://github.com/ykro/jax-openxla-field-guide).
 
 ---
