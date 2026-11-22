@@ -4,6 +4,7 @@
 - **Para quién es:** Ingenieros de Machine Learning y desarrolladores que dominan PyTorch (`nn.Module`, `loss.backward()`, `optimizer.step()`) y buscan dominar el modelo mental funcional de JAX (`@jax.jit`, PyTrees, `vmap`, `lax.scan`).
 - **Quién debería verlo:** Equipos técnicos que entrenan o sirven modelos en GPUs y Cloud TPUs y necesitan eliminar cuellos de botella de lanzamiento de kernels y recompilaciones por formas dinámicas.
 - **Video de práctica:** [jit, vmap y scan escribiendo cada fragmento de `practica/`](https://youtu.be/49o55HV0fPU).
+- **Artículo que amplía la práctica:** [La memoria que el paso puro de JAX cobra y PyTorch no](https://ykro1.substack.com/p/memoria-del-paso-puro-de-jax).
 - **Serie completa:** Parte de la guía práctica [JAX & OpenXLA Field Guide](https://github.com/ykro/jax-openxla-field-guide).
 
 ---
